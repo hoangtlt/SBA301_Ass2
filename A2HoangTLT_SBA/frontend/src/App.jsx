@@ -10,6 +10,7 @@ import PublicLayout from "./components/PublicLayout";
 import DashboardLayout from "./components/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LoginPage from "./pages/LoginPage";
+import AccountsPage from "./pages/AccountsPage";
 
 export default function App() {
   // App giữ tài khoản đăng nhập và truyền xuống các trang bằng props.
@@ -83,7 +84,7 @@ export default function App() {
           <Route
             path="admin/accounts"
             element={
-              <p>FU News</p>
+              <AccountsPage account={account} onAccountChange={setAccount} />
             }
           />
         </Route>
