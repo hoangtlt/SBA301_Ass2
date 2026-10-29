@@ -14,6 +14,7 @@ import NewsDetailPage from "./pages/NewsDetailPage";
 import LoginPage from "./pages/LoginPage";
 import AccountsPage from "./pages/AccountsPage";
 import CategoriesPage from "./pages/CategoriesPage";
+import NewsManagementPage from "./pages/NewsManagementPage";
 
 export default function App() {
   // App giữ tài khoản đăng nhập và truyền xuống các trang bằng props.
@@ -98,7 +99,7 @@ export default function App() {
         <Route
           element={<DashboardLayout account={account} onLogout={handleLogout} />}
         >
-          <Route path="staff/news" element={<p>FU News</p>} />
+          <Route path="staff/news" element={<NewsManagementPage key="all" />} />
           <Route path="staff/categories" element={<CategoriesPage />} />
           <Route
             path="staff/profile"
