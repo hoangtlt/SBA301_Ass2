@@ -11,6 +11,7 @@ import DashboardLayout from "./components/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LoginPage from "./pages/LoginPage";
 import AccountsPage from "./pages/AccountsPage";
+import CategoriesPage from "./pages/CategoriesPage";
 
 export default function App() {
   // App giữ tài khoản đăng nhập và truyền xuống các trang bằng props.
@@ -96,7 +97,7 @@ export default function App() {
           element={<DashboardLayout account={account} onLogout={handleLogout} />}
         >
           <Route path="staff/news" element={<p>FU News</p>} />
-          <Route path="staff/categories" element={<p>FU News</p>} />
+          <Route path="staff/categories" element={<CategoriesPage />} />
           <Route
             path="staff/profile"
             element={
