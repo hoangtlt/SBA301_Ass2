@@ -67,6 +67,21 @@ public class AccountService {
         }
         accounts.delete(account);
     }
+    public Responses.Account updateProfile(Integer id, Requests.Profile form) {
+        var account = find(id);
+        if (form.currentPassword().getBytes(StandardCharsets.UTF_8).length > 72
+                || !encoder.matches(form.currentPassword(), account.getAccountPassword())) {
+            throw ApiException.badRequest("Mật khẩu hiện tại không đúng.");
+        }
+        checkEmail(form.accountEmail(), id);
+        account.setAccountName(form.accountName().trim());
+        account.setAccountEmail(form.accountEmail().trim().toLowerCase(Locale.ROOT));
+        if (form.newPassword() != null && !form.newPassword().isEmpty()) {
+            validatePassword(form.newPassword());
+            account.setAccountPassword(encoder.encode(form.newPassword()));
+        }
+        return Responses.Account.from(accounts.save(account));
+    }
     private SystemAccount find(Integer id) { return accounts.findById(id).orElseThrow(() -> ApiException.notFound("Tài khoản")); }
     private void apply(SystemAccount account, Requests.Account form) {
         checkEmail(form.accountEmail(), account.getAccountId());

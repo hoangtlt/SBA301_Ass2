@@ -22,3 +22,8 @@ export async function updateAccount(id, account) {
 export async function deleteAccount(id) {
   await api.delete(`/accounts/${id}`);
 }
+
+export async function updateProfile(profile) {
+  const response = await api.put("/profile", profile);
+  return response.data;
+}

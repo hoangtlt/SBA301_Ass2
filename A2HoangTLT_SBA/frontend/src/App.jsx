@@ -15,6 +15,7 @@ import LoginPage from "./pages/LoginPage";
 import AccountsPage from "./pages/AccountsPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import NewsManagementPage from "./pages/NewsManagementPage";
+import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
   // App giữ tài khoản đăng nhập và truyền xuống các trang bằng props.
@@ -108,7 +109,7 @@ export default function App() {
           <Route
             path="staff/profile"
             element={
-              <p>FU News</p>
+              <ProfilePage account={account} onAccountChange={setAccount} />
             }
           />
         </Route>
