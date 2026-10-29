@@ -9,6 +9,8 @@ import { Route, Routes, Link } from "react-router-dom";
 import PublicLayout from "./components/PublicLayout";
 import DashboardLayout from "./components/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import NewsListPage from "./pages/NewsListPage";
+import NewsDetailPage from "./pages/NewsDetailPage";
 import LoginPage from "./pages/LoginPage";
 import AccountsPage from "./pages/AccountsPage";
 import CategoriesPage from "./pages/CategoriesPage";
@@ -56,8 +58,8 @@ export default function App() {
   return (
     <Routes>
       <Route element={<PublicLayout account={account} />}>
-        <Route index element={<p>FU News</p>} />
-        <Route path="news/:id" element={<p>FU News</p>} />
+        <Route index element={<NewsListPage />} />
+        <Route path="news/:id" element={<NewsDetailPage />} />
         <Route
           path="login"
           element={
