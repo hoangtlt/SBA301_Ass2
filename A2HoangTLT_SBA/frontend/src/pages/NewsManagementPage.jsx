@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { getNews, deleteNews } from "../services/newsService";
+import { getNews, getNewsHistory, deleteNews } from "../services/newsService";
 import { getCategories } from "../services/categoryService";
 import { errorMessage } from "../services/api";
 import {
@@ -18,8 +18,7 @@ import DeleteDialog from "../components/DeleteDialog";
 import NewsPreview from "../components/NewsPreview";
 import { formatDate } from "../format";
 
-export default function NewsManagementPage() {
-  const history = false;
+export default function NewsManagementPage({ history = false }) {
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -41,7 +40,12 @@ export default function NewsManagementPage() {
       setLoading(true);
       setError("");
       try {
-        const articles = await getNews(query);
+        let articles;
+        if (history) {
+          articles = await getNewsHistory(query);
+        } else {
+          articles = await getNews(query);
+        }
         const categoryOptions = history ? [] : await getCategories();
         if (active) {
           setRows(articles);

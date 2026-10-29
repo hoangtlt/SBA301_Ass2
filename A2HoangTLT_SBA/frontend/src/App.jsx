@@ -102,6 +102,10 @@ export default function App() {
           <Route path="staff/news" element={<NewsManagementPage key="all" />} />
           <Route path="staff/categories" element={<CategoriesPage />} />
           <Route
+            path="staff/history"
+            element={<NewsManagementPage key="history" history />}
+          />
+          <Route
             path="staff/profile"
             element={
               <p>FU News</p>

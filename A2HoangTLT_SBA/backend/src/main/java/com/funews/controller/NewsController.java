@@ -21,6 +21,10 @@ public class NewsController {
     public List<Responses.News> search(@RequestParam(defaultValue = "") String q, HttpServletRequest request) {
         auth.requireRole(request, 2); return news.search(q, null, null);
     }
+    @GetMapping("/history")
+    public List<Responses.News> history(@RequestParam(defaultValue = "") String q, HttpServletRequest request) {
+        var staff = auth.requireRole(request, 2); return news.search(q, null, staff.getAccountId());
+    }
     @GetMapping("/{id}")
     public Responses.News get(@PathVariable Integer id, HttpServletRequest request) {
         auth.requireRole(request, 2); return news.get(id, false);

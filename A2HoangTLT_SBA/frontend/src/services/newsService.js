@@ -18,6 +18,11 @@ export async function getNews(query = "") {
   return response.data;
 }
 
+export async function getNewsHistory(query = "") {
+  const response = await api.get("/news/history", { params: { q: query } });
+  return response.data;
+}
+
 export async function createNews(article) {
   const response = await api.post("/news", article);
   return response.data;
