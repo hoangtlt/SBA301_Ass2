@@ -16,7 +16,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -30,15 +29,18 @@ public class AuthService {
     }
 
     public Responses.Session login(Requests.Login form, HttpServletRequest request) {
-        Optional<SystemAccount> accountResult = accounts.findByAccountEmailIgnoreCase(form.email().trim());
-        if (accountResult.isEmpty()) {
+        SystemAccount account = accounts.findByAccountEmailIgnoreCase(form.email().trim()).orElse(null);
+        if (account == null) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Email hoặc mật khẩu không đúng.");
         }
-        SystemAccount account = accountResult.get();
-        if (form.password().getBytes(StandardCharsets.UTF_8).length > 72
-                || !encoder.matches(form.password(), account.getAccountPassword())) {
+        String password = form.password();
+        if (password.getBytes(StandardCharsets.UTF_8).length > 72) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Email hoặc mật khẩu không đúng.");
         }
+        if (!encoder.matches(password, account.getAccountPassword())) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Email hoặc mật khẩu không đúng.");
+        }
+        // Tạo phiên đăng nhập mới sau khi xác thực thành công.
         HttpSession oldSession = request.getSession(false);
         if (oldSession != null) {
             oldSession.invalidate();
@@ -60,18 +62,21 @@ public class AuthService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Vui lòng đăng nhập.");
         }
         Integer id = (Integer) accountId;
-        // Reload the account so deleted accounts and role changes take effect immediately.
-        Optional<SystemAccount> accountResult = accounts.findById(id);
-        if (accountResult.isEmpty()) {
+        // Đọc lại tài khoản để áp dụng ngay việc xóa tài khoản hoặc đổi vai trò.
+        SystemAccount account = accounts.findById(id).orElse(null);
+        if (account == null) {
             session.invalidate();
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Tài khoản không còn tồn tại.");
         }
-        SystemAccount account = accountResult.get();
         if (!"GET".equals(request.getMethod())) {
-            String expected = (String) session.getAttribute("csrfToken");
-            String actual = request.getHeader("X-CSRF-Token");
-            if (expected == null || actual == null || !MessageDigest.isEqual(
-                    expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8))) {
+            String sessionToken = (String) session.getAttribute("csrfToken");
+            String requestToken = request.getHeader("X-CSRF-Token");
+            if (sessionToken == null || requestToken == null) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Phiên yêu cầu không hợp lệ. Vui lòng đăng nhập lại.");
+            }
+            byte[] sessionTokenBytes = sessionToken.getBytes(StandardCharsets.UTF_8);
+            byte[] requestTokenBytes = requestToken.getBytes(StandardCharsets.UTF_8);
+            if (!MessageDigest.isEqual(sessionTokenBytes, requestTokenBytes)) {
                 throw new ApiException(HttpStatus.FORBIDDEN, "Phiên yêu cầu không hợp lệ. Vui lòng đăng nhập lại.");
             }
         }
@@ -88,11 +93,15 @@ public class AuthService {
 
     public Responses.Session me(HttpServletRequest request) {
         SystemAccount account = current(request);
-        return new Responses.Session(Responses.Account.from(account), (String) request.getSession(false).getAttribute("csrfToken"));
+        HttpSession session = request.getSession(false);
+        String token = (String) session.getAttribute("csrfToken");
+        Responses.Account accountResponse = Responses.Account.from(account);
+        return new Responses.Session(accountResponse, token);
     }
 
     public void logout(HttpServletRequest request) {
         current(request);
-        request.getSession(false).invalidate();
+        HttpSession session = request.getSession(false);
+        session.invalidate();
     }
 }

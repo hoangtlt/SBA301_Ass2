@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -50,7 +49,11 @@ public class NewsService {
 
     @Transactional(readOnly = true)
     public Responses.News get(Integer id, boolean publicOnly) {
-        NewsArticle article = find(id);
+        NewsArticle article = news.findById(id).orElse(null);
+        if (article == null) {
+            throw ApiException.notFound("Bài viết");
+        }
+
         if (publicOnly && article.getNewsStatus() != 1) {
             throw ApiException.notFound("Bài viết");
         }
@@ -61,47 +64,25 @@ public class NewsService {
         NewsArticle article = new NewsArticle();
         article.setCreatedBy(author);
         article.setCreatedDate(LocalDateTime.now());
-        apply(article, form);
-        return Responses.News.from(news.save(article));
-    }
-
-    public Responses.News update(Integer id, Requests.News form, SystemAccount editor) {
-        NewsArticle article = find(id);
-        List<Tag> oldTags = new ArrayList<>(article.getTags());
-        apply(article, form);
-        article.setUpdatedBy(editor);
-        article.setModifiedDate(LocalDateTime.now());
-        news.saveAndFlush(article);
-        tags.deleteAll(oldTags);
-        return Responses.News.from(article);
-    }
-
-    public void delete(Integer id) {
-        NewsArticle article = find(id);
-        List<Tag> oldTags = new ArrayList<>(article.getTags());
-        news.delete(article);
-        news.flush();
-        tags.deleteAll(oldTags);
-    }
-
-    private void apply(NewsArticle article, Requests.News form) {
-        Optional<Category> categoryResult = categories.findById(form.categoryId());
-        if (categoryResult.isEmpty()) {
+        Category category = categories.findById(form.categoryId()).orElse(null);
+        if (category == null) {
             throw ApiException.notFound("Danh mục");
         }
-        Category category = categoryResult.get();
-        // Allow editing a draft in its existing inactive category, but never publish into it.
-        boolean sameCategory = article.getCategory() != null && article.getCategory().getCategoryId().equals(category.getCategoryId());
-        if (!category.getIsActive() && (form.newsStatus() == 1 || !sameCategory)) {
+        if (!category.getIsActive()) {
             throw ApiException.badRequest("Vui lòng chọn danh mục đang hoạt động.");
         }
-        Set<String> names = new HashSet<>();
+
+        // Tên tag trong cùng bài viết không được trùng nhau, kể cả khác chữ hoa/thường.
+        Set<String> tagNames = new HashSet<>();
         List<Tag> newTags = new ArrayList<>();
         for (Requests.Tag tagForm : form.tags()) {
             String name = tagForm.tagName().trim();
-            if (!names.add(name.toLowerCase(Locale.ROOT))) {
+            String normalizedName = name.toLowerCase(Locale.ROOT);
+            if (tagNames.contains(normalizedName)) {
                 throw ApiException.badRequest("Tag trong cùng bài viết không được trùng tên.");
             }
+            tagNames.add(normalizedName);
+
             Tag tag = new Tag();
             tag.setTagName(name);
             if (tagForm.note() == null) {
@@ -111,6 +92,65 @@ public class NewsService {
             }
             newTags.add(tag);
         }
+
+        article.setNewsTitle(form.newsTitle().trim());
+        article.setHeadline(form.headline().trim());
+        article.setNewsContent(form.newsContent().trim());
+        if (form.newsSource() == null) {
+            article.setNewsSource("");
+        } else {
+            article.setNewsSource(form.newsSource().trim());
+        }
+        article.setCategory(category);
+        article.setNewsStatus(form.newsStatus());
+        article.getTags().addAll(newTags);
+
+        NewsArticle savedArticle = news.save(article);
+        return Responses.News.from(savedArticle);
+    }
+
+    public Responses.News update(Integer id, Requests.News form, SystemAccount editor) {
+        NewsArticle article = news.findById(id).orElse(null);
+        if (article == null) {
+            throw ApiException.notFound("Bài viết");
+        }
+        List<Tag> oldTags = new ArrayList<>(article.getTags());
+
+        Category category = categories.findById(form.categoryId()).orElse(null);
+        if (category == null) {
+            throw ApiException.notFound("Danh mục");
+        }
+        // Cho phép sửa bản nháp trong danh mục cũ đã ngừng hoạt động.
+        boolean sameCategory = false;
+        if (article.getCategory() != null) {
+            sameCategory = article.getCategory().getCategoryId().equals(category.getCategoryId());
+        }
+        if (!category.getIsActive()) {
+            if (form.newsStatus() == 1 || !sameCategory) {
+                throw ApiException.badRequest("Vui lòng chọn danh mục đang hoạt động.");
+            }
+        }
+
+        Set<String> tagNames = new HashSet<>();
+        List<Tag> newTags = new ArrayList<>();
+        for (Requests.Tag tagForm : form.tags()) {
+            String name = tagForm.tagName().trim();
+            String normalizedName = name.toLowerCase(Locale.ROOT);
+            if (tagNames.contains(normalizedName)) {
+                throw ApiException.badRequest("Tag trong cùng bài viết không được trùng tên.");
+            }
+            tagNames.add(normalizedName);
+
+            Tag tag = new Tag();
+            tag.setTagName(name);
+            if (tagForm.note() == null) {
+                tag.setNote("");
+            } else {
+                tag.setNote(tagForm.note().trim());
+            }
+            newTags.add(tag);
+        }
+
         article.setNewsTitle(form.newsTitle().trim());
         article.setHeadline(form.headline().trim());
         article.setNewsContent(form.newsContent().trim());
@@ -123,13 +163,24 @@ public class NewsService {
         article.setNewsStatus(form.newsStatus());
         article.getTags().clear();
         article.getTags().addAll(newTags);
+        article.setUpdatedBy(editor);
+        article.setModifiedDate(LocalDateTime.now());
+
+        // Lưu liên kết tag mới trước khi xóa các tag cũ.
+        news.saveAndFlush(article);
+        tags.deleteAll(oldTags);
+        return Responses.News.from(article);
     }
 
-    private NewsArticle find(Integer id) {
-        Optional<NewsArticle> article = news.findById(id);
-        if (article.isEmpty()) {
+    public void delete(Integer id) {
+        NewsArticle article = news.findById(id).orElse(null);
+        if (article == null) {
             throw ApiException.notFound("Bài viết");
         }
-        return article.get();
+        List<Tag> oldTags = new ArrayList<>(article.getTags());
+        news.delete(article);
+        news.flush();
+        tags.deleteAll(oldTags);
     }
+
 }

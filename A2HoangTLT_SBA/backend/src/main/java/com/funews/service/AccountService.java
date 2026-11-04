@@ -16,10 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 
 @Service
 @Transactional
@@ -41,24 +39,46 @@ public class AccountService {
         for (SystemAccount account : accountList) {
             result.add(Responses.Account.from(account));
         }
-        return Collections.unmodifiableList(result);
+        return result;
     }
 
     @Transactional(readOnly = true)
     public Responses.Account get(Integer id) {
-        return Responses.Account.from(find(id));
+        SystemAccount account = accounts.findById(id).orElse(null);
+        if (account == null) {
+            throw ApiException.notFound("Tài khoản");
+        }
+        return Responses.Account.from(account);
     }
 
     public Responses.Account create(Requests.Account form) {
+        SystemAccount existingAccount = accounts.findByAccountEmailIgnoreCase(form.accountEmail().trim()).orElse(null);
+        if (existingAccount != null) {
+            throw ApiException.conflict("Email đã được sử dụng.");
+        }
+
         SystemAccount account = new SystemAccount();
-        apply(account, form);
-        validatePassword(form.password());
-        account.setAccountPassword(encoder.encode(form.password()));
-        return Responses.Account.from(accounts.save(account));
+        account.setAccountName(form.accountName().trim());
+        account.setAccountEmail(form.accountEmail().trim().toLowerCase(Locale.ROOT));
+        account.setAccountRole(form.accountRole());
+
+        String password = form.password();
+        if (password == null || password.isBlank() || password.length() < 6
+                || password.getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw ApiException.badRequest("Mật khẩu phải có ít nhất 6 ký tự và tối đa 72 byte UTF-8.");
+        }
+        account.setAccountPassword(encoder.encode(password));
+
+        SystemAccount savedAccount = accounts.save(account);
+        return Responses.Account.from(savedAccount);
     }
 
     public Responses.Account update(Integer id, Requests.Account form, Integer currentId) {
-        SystemAccount account = find(id);
+        SystemAccount account = accounts.findById(id).orElse(null);
+        if (account == null) {
+            throw ApiException.notFound("Tài khoản");
+        }
+
         if (id.equals(currentId) && form.accountRole() != 1) {
             throw ApiException.badRequest("Không thể tự đổi vai trò của tài khoản đang đăng nhập.");
         }
@@ -68,16 +88,33 @@ public class AccountService {
         if (account.getAccountRole() == 2 && form.accountRole() != 2 && news.existsByCreatedByAccountId(id)) {
             throw ApiException.conflict("Không thể đổi vai trò Staff đã tạo bài viết.");
         }
-        apply(account, form);
-        if (form.password() != null && !form.password().isEmpty()) {
-            validatePassword(form.password());
-            account.setAccountPassword(encoder.encode(form.password()));
+        SystemAccount existingAccount = accounts.findByAccountEmailIgnoreCase(form.accountEmail().trim()).orElse(null);
+        if (existingAccount != null && !existingAccount.getAccountId().equals(account.getAccountId())) {
+            throw ApiException.conflict("Email đã được sử dụng.");
         }
-        return Responses.Account.from(accounts.save(account));
+        account.setAccountName(form.accountName().trim());
+        account.setAccountEmail(form.accountEmail().trim().toLowerCase(Locale.ROOT));
+        account.setAccountRole(form.accountRole());
+
+        String password = form.password();
+        if (password != null && !password.isEmpty()) {
+            if (password.isBlank() || password.length() < 6
+                    || password.getBytes(StandardCharsets.UTF_8).length > 72) {
+                throw ApiException.badRequest("Mật khẩu phải có ít nhất 6 ký tự và tối đa 72 byte UTF-8.");
+            }
+            account.setAccountPassword(encoder.encode(password));
+        }
+
+        SystemAccount savedAccount = accounts.save(account);
+        return Responses.Account.from(savedAccount);
     }
 
     public void delete(Integer id, Integer currentId) {
-        SystemAccount account = find(id);
+        SystemAccount account = accounts.findById(id).orElse(null);
+        if (account == null) {
+            throw ApiException.notFound("Tài khoản");
+        }
+
         if (news.existsByCreatedByAccountId(id)) {
             throw ApiException.conflict("Không thể xóa tài khoản đã tạo bài viết.");
         }
@@ -88,7 +125,7 @@ public class AccountService {
             throw ApiException.badRequest("Hệ thống phải có ít nhất một Admin.");
         }
         if (news.existsByUpdatedByAccountId(id)) {
-            // UpdatedBy is optional; preserve articles if only their editor is deleted.
+            // Giữ lại bài viết và bỏ thông tin người chỉnh sửa khi xóa tài khoản.
             for (NewsArticle article : news.findAll()) {
                 if (article.getUpdatedBy() != null && article.getUpdatedBy().getAccountId().equals(id)) {
                     article.setUpdatedBy(null);
@@ -100,46 +137,32 @@ public class AccountService {
     }
 
     public Responses.Account updateProfile(Integer id, Requests.Profile form) {
-        SystemAccount account = find(id);
+        SystemAccount account = accounts.findById(id).orElse(null);
+        if (account == null) {
+            throw ApiException.notFound("Tài khoản");
+        }
+
         if (form.currentPassword().getBytes(StandardCharsets.UTF_8).length > 72
                 || !encoder.matches(form.currentPassword(), account.getAccountPassword())) {
             throw ApiException.badRequest("Mật khẩu hiện tại không đúng.");
         }
-        checkEmail(form.accountEmail(), id);
-        account.setAccountName(form.accountName().trim());
-        account.setAccountEmail(form.accountEmail().trim().toLowerCase(Locale.ROOT));
-        if (form.newPassword() != null && !form.newPassword().isEmpty()) {
-            validatePassword(form.newPassword());
-            account.setAccountPassword(encoder.encode(form.newPassword()));
-        }
-        return Responses.Account.from(accounts.save(account));
-    }
-
-    private SystemAccount find(Integer id) {
-        Optional<SystemAccount> account = accounts.findById(id);
-        if (account.isEmpty()) {
-            throw ApiException.notFound("Tài khoản");
-        }
-        return account.get();
-    }
-
-    private void apply(SystemAccount account, Requests.Account form) {
-        checkEmail(form.accountEmail(), account.getAccountId());
-        account.setAccountName(form.accountName().trim());
-        account.setAccountEmail(form.accountEmail().trim().toLowerCase(Locale.ROOT));
-        account.setAccountRole(form.accountRole());
-    }
-
-    private void checkEmail(String email, Integer id) {
-        Optional<SystemAccount> existing = accounts.findByAccountEmailIgnoreCase(email.trim());
-        if (existing.isPresent() && !existing.get().getAccountId().equals(id)) {
+        SystemAccount existingAccount = accounts.findByAccountEmailIgnoreCase(form.accountEmail().trim()).orElse(null);
+        if (existingAccount != null && !existingAccount.getAccountId().equals(id)) {
             throw ApiException.conflict("Email đã được sử dụng.");
         }
-    }
+        account.setAccountName(form.accountName().trim());
+        account.setAccountEmail(form.accountEmail().trim().toLowerCase(Locale.ROOT));
 
-    public static void validatePassword(String password) {
-        if (password == null || password.isBlank() || password.length() < 6 || password.getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw ApiException.badRequest("Mật khẩu phải có ít nhất 6 ký tự và tối đa 72 byte UTF-8.");
+        String newPassword = form.newPassword();
+        if (newPassword != null && !newPassword.isEmpty()) {
+            if (newPassword.isBlank() || newPassword.length() < 6
+                    || newPassword.getBytes(StandardCharsets.UTF_8).length > 72) {
+                throw ApiException.badRequest("Mật khẩu phải có ít nhất 6 ký tự và tối đa 72 byte UTF-8.");
+            }
+            account.setAccountPassword(encoder.encode(newPassword));
         }
+
+        SystemAccount savedAccount = accounts.save(account);
+        return Responses.Account.from(savedAccount);
     }
 }

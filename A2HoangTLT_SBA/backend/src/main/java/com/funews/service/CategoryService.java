@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -42,19 +41,85 @@ public class CategoryService {
 
     @Transactional(readOnly = true)
     public Responses.Category get(Integer id) {
-        return Responses.Category.from(find(id));
+        Category category = categories.findById(id).orElse(null);
+        if (category == null) {
+            throw ApiException.notFound("Danh mục");
+        }
+        return Responses.Category.from(category);
     }
 
     public Responses.Category create(Requests.Category form) {
-        return save(new Category(), form);
+        Category parent = null;
+        if (form.parentCategoryId() != null) {
+            parent = categories.findById(form.parentCategoryId()).orElse(null);
+            if (parent == null) {
+                throw ApiException.notFound("Danh mục");
+            }
+        }
+
+        // Kiểm tra danh mục cha để tránh quan hệ lặp vô hạn.
+        Set<Integer> visited = new HashSet<>();
+        Category currentParent = parent;
+        while (currentParent != null) {
+            Integer parentId = currentParent.getCategoryId();
+            if (visited.contains(parentId)) {
+                throw ApiException.badRequest("Danh mục cha tạo thành vòng lặp.");
+            }
+            visited.add(parentId);
+            currentParent = currentParent.getParentCategory();
+        }
+
+        Category category = new Category();
+        category.setCategoryName(form.categoryName().trim());
+        category.setCategoryDescription(form.categoryDescription().trim());
+        category.setParentCategory(parent);
+        category.setIsActive(form.isActive());
+
+        Category savedCategory = categories.save(category);
+        return Responses.Category.from(savedCategory);
     }
 
     public Responses.Category update(Integer id, Requests.Category form) {
-        return save(find(id), form);
+        Category category = categories.findById(id).orElse(null);
+        if (category == null) {
+            throw ApiException.notFound("Danh mục");
+        }
+
+        Category parent = null;
+        if (form.parentCategoryId() != null) {
+            parent = categories.findById(form.parentCategoryId()).orElse(null);
+            if (parent == null) {
+                throw ApiException.notFound("Danh mục");
+            }
+        }
+
+        // Danh mục không được làm cha của chính nó hoặc tạo vòng lặp qua danh mục con.
+        Set<Integer> visited = new HashSet<>();
+        Category currentParent = parent;
+        while (currentParent != null) {
+            Integer parentId = currentParent.getCategoryId();
+            if (parentId.equals(category.getCategoryId()) || visited.contains(parentId)) {
+                throw ApiException.badRequest("Danh mục cha tạo thành vòng lặp.");
+            }
+            visited.add(parentId);
+            currentParent = currentParent.getParentCategory();
+        }
+
+        category.setCategoryName(form.categoryName().trim());
+        category.setCategoryDescription(form.categoryDescription().trim());
+        category.setParentCategory(parent);
+        category.setIsActive(form.isActive());
+
+        Category savedCategory = categories.save(category);
+        return Responses.Category.from(savedCategory);
     }
 
     public void delete(Integer id) {
-        Category category = find(id);
+        Category category = categories.findById(id).orElse(null);
+        if (category == null) {
+            throw ApiException.notFound("Danh mục");
+        }
+
         if (news.existsByCategoryCategoryId(id)) {
             throw ApiException.conflict("Không thể xóa danh mục đang có bài viết.");
         }
@@ -64,29 +129,4 @@ public class CategoryService {
         categories.delete(category);
     }
 
-    private Responses.Category save(Category category, Requests.Category form) {
-        Category parent = null;
-        if (form.parentCategoryId() != null) {
-            parent = find(form.parentCategoryId());
-        }
-        Set<Integer> visited = new HashSet<>();
-        for (Category cursor = parent; cursor != null; cursor = cursor.getParentCategory()) {
-            if (cursor.getCategoryId().equals(category.getCategoryId()) || !visited.add(cursor.getCategoryId())) {
-                throw ApiException.badRequest("Danh mục cha tạo thành vòng lặp.");
-            }
-        }
-        category.setCategoryName(form.categoryName().trim());
-        category.setCategoryDescription(form.categoryDescription().trim());
-        category.setParentCategory(parent);
-        category.setIsActive(form.isActive());
-        return Responses.Category.from(categories.save(category));
-    }
-
-    private Category find(Integer id) {
-        Optional<Category> category = categories.findById(id);
-        if (category.isEmpty()) {
-            throw ApiException.notFound("Danh mục");
-        }
-        return category.get();
-    }
 }
