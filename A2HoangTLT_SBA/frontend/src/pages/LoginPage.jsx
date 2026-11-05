@@ -32,6 +32,7 @@ export default function LoginPage({ account, loading, onLogin }) {
       const destination =
         user.accountRole === 1 ? "/admin/accounts" : "/staff/news";
       const requested = location.state?.from;
+      // Chỉ quay lại đường dẫn thuộc vai trò vừa đăng nhập; còn lại về trang mặc định.
       navigate(
         requested?.startsWith(user.accountRole === 1 ? "/admin/" : "/staff/")
           ? requested

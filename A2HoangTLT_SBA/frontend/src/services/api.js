@@ -16,6 +16,7 @@ export function setCsrfToken(value) {
 }
 
 api.interceptors.request.use((config) => {
+  // Cookie xác định phiên; CSRF token xác nhận các thao tác thay đổi dữ liệu.
   if (csrfToken && ["post", "put", "delete"].includes(config.method)) {
     config.headers["X-CSRF-Token"] = csrfToken;
   }
@@ -24,6 +25,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Không coi 401 khi kiểm tra phiên/đăng nhập là sự kiện hết hạn phiên đang sử dụng.
     if (
       error.response?.status === 401 &&
       !["/auth/login", "/auth/me"].includes(error.config?.url)

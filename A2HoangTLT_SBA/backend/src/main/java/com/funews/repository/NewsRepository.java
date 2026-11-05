@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface NewsRepository extends JpaRepository<NewsArticle, Integer> {
+    // Bộ lọc null nghĩa là bỏ qua; LEFT JOIN giữ bài không có tag, DISTINCT tránh lặp bài.
     @Query("""
         select distinct n from NewsArticle n left join n.tags t
         where (:status is null or n.newsStatus = :status)

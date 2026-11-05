@@ -62,6 +62,7 @@ public class AccountService {
         account.setAccountEmail(form.accountEmail().trim().toLowerCase(Locale.ROOT));
         account.setAccountRole(form.accountRole());
 
+        // BCrypt giới hạn 72 byte UTF-8; số byte có thể lớn hơn số ký tự.
         String password = form.password();
         if (password == null || password.isBlank() || password.length() < 6
                 || password.getBytes(StandardCharsets.UTF_8).length > 72) {
@@ -79,6 +80,7 @@ public class AccountService {
             throw ApiException.notFound("Tài khoản");
         }
 
+        // Giữ quyền của Admin hiện tại, Admin cuối cùng và vai trò Staff đã tạo bài.
         if (id.equals(currentId) && form.accountRole() != 1) {
             throw ApiException.badRequest("Không thể tự đổi vai trò của tài khoản đang đăng nhập.");
         }
@@ -89,6 +91,7 @@ public class AccountService {
             throw ApiException.conflict("Không thể đổi vai trò Staff đã tạo bài viết.");
         }
         SystemAccount existingAccount = accounts.findByAccountEmailIgnoreCase(form.accountEmail().trim()).orElse(null);
+        // Cho phép giữ email cũ, nhưng không dùng email của tài khoản khác.
         if (existingAccount != null && !existingAccount.getAccountId().equals(account.getAccountId())) {
             throw ApiException.conflict("Email đã được sử dụng.");
         }
@@ -97,6 +100,7 @@ public class AccountService {
         account.setAccountRole(form.accountRole());
 
         String password = form.password();
+        // Khi sửa tài khoản, mật khẩu để trống nghĩa là giữ nguyên bản băm cũ.
         if (password != null && !password.isEmpty()) {
             if (password.isBlank() || password.length() < 6
                     || password.getBytes(StandardCharsets.UTF_8).length > 72) {
@@ -115,6 +119,7 @@ public class AccountService {
             throw ApiException.notFound("Tài khoản");
         }
 
+        // Bảo toàn tác giả bài viết và ngăn xóa tài khoản hiện tại hoặc Admin cuối cùng.
         if (news.existsByCreatedByAccountId(id)) {
             throw ApiException.conflict("Không thể xóa tài khoản đã tạo bài viết.");
         }
@@ -125,7 +130,7 @@ public class AccountService {
             throw ApiException.badRequest("Hệ thống phải có ít nhất một Admin.");
         }
         if (news.existsByUpdatedByAccountId(id)) {
-            // Giữ lại bài viết và bỏ thông tin người chỉnh sửa khi xóa tài khoản.
+            // JPA tự ghi nhận updatedBy = null; flush bỏ khóa ngoại trước khi xóa tài khoản.
             for (NewsArticle article : news.findAll()) {
                 if (article.getUpdatedBy() != null && article.getUpdatedBy().getAccountId().equals(id)) {
                     article.setUpdatedBy(null);
@@ -142,6 +147,7 @@ public class AccountService {
             throw ApiException.notFound("Tài khoản");
         }
 
+        // Xác minh mật khẩu hiện tại trước mọi thay đổi hồ sơ, kể cả chỉ sửa tên/email.
         if (form.currentPassword().getBytes(StandardCharsets.UTF_8).length > 72
                 || !encoder.matches(form.currentPassword(), account.getAccountPassword())) {
             throw ApiException.badRequest("Mật khẩu hiện tại không đúng.");

@@ -49,6 +49,7 @@ export default function AccountsPage({ account, onAccountChange }) {
     };
   }, [query, reloadCount]);
   function saved(value) {
+    // Sửa chính mình thì đồng bộ account ở App để tên trên menu đổi ngay.
     if (value.accountId === account.accountId) onAccountChange(value);
     setForm(null);
     setSuccess("Đã lưu tài khoản.");

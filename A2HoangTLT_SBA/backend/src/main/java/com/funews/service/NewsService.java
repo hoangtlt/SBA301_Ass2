@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+// Bài viết, liên kết và tags cùng transaction để tránh lưu dở dang khi có lỗi.
 @Service
 @Transactional
 public class NewsService {
@@ -54,6 +55,7 @@ public class NewsService {
             throw ApiException.notFound("Bài viết");
         }
 
+        // Trả 404 cho bản nháp để không lộ bài qua URL công khai chứa ID.
         if (publicOnly && article.getNewsStatus() != 1) {
             throw ApiException.notFound("Bài viết");
         }
@@ -72,7 +74,7 @@ public class NewsService {
             throw ApiException.badRequest("Vui lòng chọn danh mục đang hoạt động.");
         }
 
-        // Tên tag trong cùng bài viết không được trùng nhau, kể cả khác chữ hoa/thường.
+        // Chuẩn hóa tên rồi dùng HashSet để chặn tag trùng, không phân biệt hoa/thường.
         Set<String> tagNames = new HashSet<>();
         List<Tag> newTags = new ArrayList<>();
         for (Requests.Tag tagForm : form.tags()) {
@@ -120,7 +122,7 @@ public class NewsService {
         if (category == null) {
             throw ApiException.notFound("Danh mục");
         }
-        // Cho phép sửa bản nháp trong danh mục cũ đã ngừng hoạt động.
+        // Danh mục ngừng hoạt động chỉ được giữ lại khi lưu bản nháp trong danh mục cũ.
         boolean sameCategory = false;
         if (article.getCategory() != null) {
             sameCategory = article.getCategory().getCategoryId().equals(category.getCategoryId());
@@ -131,6 +133,7 @@ public class NewsService {
             }
         }
 
+        // Chuẩn hóa tên rồi dùng HashSet để chặn tag trùng trong danh sách thay thế.
         Set<String> tagNames = new HashSet<>();
         List<Tag> newTags = new ArrayList<>();
         for (Requests.Tag tagForm : form.tags()) {
@@ -161,12 +164,13 @@ public class NewsService {
         }
         article.setCategory(category);
         article.setNewsStatus(form.newsStatus());
+        // Thay toàn bộ tags; danh sách oldTags được giữ riêng để dọn sau khi gỡ liên kết.
         article.getTags().clear();
         article.getTags().addAll(newTags);
         article.setUpdatedBy(editor);
         article.setModifiedDate(LocalDateTime.now());
 
-        // Lưu liên kết tag mới trước khi xóa các tag cũ.
+        // Flush thay đổi bảng NewsTag trước khi xóa tag cũ để tránh lỗi khóa ngoại.
         news.saveAndFlush(article);
         tags.deleteAll(oldTags);
         return Responses.News.from(article);
@@ -178,6 +182,7 @@ public class NewsService {
             throw ApiException.notFound("Bài viết");
         }
         List<Tag> oldTags = new ArrayList<>(article.getTags());
+        // Xóa bài và liên kết trước; tags thuộc riêng bài nên được dọn sau khi flush.
         news.delete(article);
         news.flush();
         tags.deleteAll(oldTags);

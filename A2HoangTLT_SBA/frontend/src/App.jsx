@@ -23,6 +23,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Khôi phục account/token từ cookie session; active ngăn kết quả cũ cập nhật state.
     let active = true;
     async function restoreSession() {
       try {
@@ -35,6 +36,7 @@ export default function App() {
       }
     }
     function expireSession() {
+      // API báo phiên hết hạn: xóa state/token để ProtectedRoute đưa về đăng nhập.
       setAccount(null);
       setCsrfToken("");
     }

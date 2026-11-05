@@ -15,6 +15,7 @@ export default function NewsDetailPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
+    // Khi đổi ID hoặc rời trang, phản hồi bài trước không được ghi đè state mới.
     let active = true;
     async function loadArticle() {
       setLoading(true);

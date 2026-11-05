@@ -31,16 +31,19 @@ export default function NewsManagementPage({ history = false }) {
   const [success, setSuccess] = useState("");
 
   function refresh() {
+    // Đổi bộ đếm để useEffect tải lại danh sách sau khi lưu/xóa.
     setReloadCount((count) => count + 1);
   }
 
   useEffect(() => {
+    // Bỏ qua phản hồi cũ khi đổi bộ lọc/chế độ hoặc rời trang; không hủy request.
     let active = true;
     async function loadNews() {
       setLoading(true);
       setError("");
       try {
         let articles;
+        // Dùng chung màn hình: lịch sử chỉ tải bài của mình và không cần danh mục cho form.
         if (history) {
           articles = await getNewsHistory(query);
         } else {

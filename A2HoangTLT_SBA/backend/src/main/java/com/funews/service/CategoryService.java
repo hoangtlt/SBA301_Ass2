@@ -57,7 +57,7 @@ public class CategoryService {
             }
         }
 
-        // Kiểm tra danh mục cha để tránh quan hệ lặp vô hạn.
+        // Duyệt ngược chuỗi cha; HashSet ghi nhớ ID để phát hiện vòng lặp có sẵn.
         Set<Integer> visited = new HashSet<>();
         Category currentParent = parent;
         while (currentParent != null) {
@@ -93,7 +93,7 @@ public class CategoryService {
             }
         }
 
-        // Danh mục không được làm cha của chính nó hoặc tạo vòng lặp qua danh mục con.
+        // Duyệt tổ tiên của cha mới; gặp chính danh mục đang sửa hoặc ID lặp thì từ chối.
         Set<Integer> visited = new HashSet<>();
         Category currentParent = parent;
         while (currentParent != null) {
@@ -120,6 +120,7 @@ public class CategoryService {
             throw ApiException.notFound("Danh mục");
         }
 
+        // Chỉ xóa danh mục không còn bài viết hoặc danh mục con tham chiếu đến.
         if (news.existsByCategoryCategoryId(id)) {
             throw ApiException.conflict("Không thể xóa danh mục đang có bài viết.");
         }

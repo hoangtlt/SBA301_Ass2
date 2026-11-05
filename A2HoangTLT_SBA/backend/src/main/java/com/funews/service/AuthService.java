@@ -40,7 +40,7 @@ public class AuthService {
         if (!encoder.matches(password, account.getAccountPassword())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Email hoặc mật khẩu không đúng.");
         }
-        // Tạo phiên đăng nhập mới sau khi xác thực thành công.
+        // Hủy phiên cũ và cấp phiên/token mới để tránh tái sử dụng session ID trước đăng nhập.
         HttpSession oldSession = request.getSession(false);
         if (oldSession != null) {
             oldSession.invalidate();
@@ -68,6 +68,7 @@ public class AuthService {
             session.invalidate();
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Tài khoản không còn tồn tại.");
         }
+        // Yêu cầu token khớp session cho request khác GET để chống giả mạo yêu cầu (CSRF).
         if (!"GET".equals(request.getMethod())) {
             String sessionToken = (String) session.getAttribute("csrfToken");
             String requestToken = request.getHeader("X-CSRF-Token");
@@ -76,6 +77,7 @@ public class AuthService {
             }
             byte[] sessionTokenBytes = sessionToken.getBytes(StandardCharsets.UTF_8);
             byte[] requestTokenBytes = requestToken.getBytes(StandardCharsets.UTF_8);
+            // So sánh token bằng hàm chuyên dụng để hạn chế lộ thông tin qua thời gian so sánh.
             if (!MessageDigest.isEqual(sessionTokenBytes, requestTokenBytes)) {
                 throw new ApiException(HttpStatus.FORBIDDEN, "Phiên yêu cầu không hợp lệ. Vui lòng đăng nhập lại.");
             }

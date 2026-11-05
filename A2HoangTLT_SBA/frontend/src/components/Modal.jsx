@@ -15,6 +15,7 @@ export default function Modal({
   useEffect(() => {
     const dialog = ref.current;
     dialog.showModal();
+    // Khóa cuộn nền khi mở popup và khôi phục đúng giá trị trước đó khi đóng.
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -28,6 +29,7 @@ export default function Modal({
       className={`modal ${wide ? "modal-wide" : ""}`}
       aria-labelledby="modal-title"
       onCancel={(e) => {
+        // Tự xử lý phím Escape để popup không đóng giữa lúc đang lưu/xóa.
         e.preventDefault();
         if (!busy) onClose();
       }}

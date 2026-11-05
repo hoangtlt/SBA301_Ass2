@@ -16,6 +16,7 @@ export default function NewsListPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // Bỏ qua kết quả tìm kiếm cũ nếu từ khóa đổi hoặc người dùng rời trang.
     let active = true;
     async function loadNews() {
       setLoading(true);

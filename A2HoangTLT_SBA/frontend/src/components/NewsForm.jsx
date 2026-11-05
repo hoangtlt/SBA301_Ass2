@@ -46,6 +46,7 @@ export default function NewsForm({ article, categories, onClose, onSaved }) {
     }
   }
   const change = (key, value) => setForm({ ...form, [key]: value });
+  // Tạo mảng và object tag mới để cập nhật state mà không sửa trực tiếp dữ liệu cũ.
   const changeTag = (index, key, value) =>
     change(
       "tags",
@@ -61,6 +62,7 @@ export default function NewsForm({ article, categories, onClose, onSaved }) {
       categoryId: Number(form.categoryId),
     });
   }
+  // Giữ danh mục cũ dù đã ngừng hoạt động; BE quyết định có cho lưu theo trạng thái bài.
   const options = categories.filter(
     (c) => c.isActive || c.categoryId === article?.categoryId,
   );
